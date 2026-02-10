@@ -5,7 +5,8 @@
   const TARGETS = [
     { selector: "span.avg_rating", kind: "value" },
     { selector: "span.avg_rating_friends", kind: "value" },
-    { selector: "[id^='rating_num_l_']", kind: "value" }
+    { selector: "[id^='rating_num_l_']", kind: "value" },
+    { selector: ".page_charts_section_charts_item_details_average_num", kind: "value" }
   ];
 
   // Containers where the rating number is often nested:
