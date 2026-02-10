@@ -13,6 +13,15 @@
   const MAX_RATING_CONTAINER = ".max_rating"; // the "5.0" part next to the slash
   const TRACK_STATS_CONTAINER = ".page_release_section_tracks_songs_song_stats"; // per-track right-side stats
 
+  const DEFAULTS = { enabled: true };
+  let ENABLED = true;
+
+  const loadEnabled = () =>
+    new Promise((resolve) => {
+      if (!chrome?.storage?.sync) return resolve(true);
+      chrome.storage.sync.get(DEFAULTS, (s) => resolve(!!s.enabled));
+    });
+
   const format2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
   const format1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -92,15 +101,52 @@
     });
   };
 
+  const restoreAll = () => {
+    document
+      .querySelectorAll("[data-rym10-done='1'], [data-rym10done='1']")
+      .forEach((el) => {
+        // Support either attribute casing if you ever changed it; your code uses rym10Done
+        const original = el.dataset.rymOriginal5;
+        if (!original) return;
+
+        // Put back the original text
+        el.textContent = original;
+
+        // Clear marker so it can be converted again later
+        delete el.dataset.rym10Done;
+        delete el.dataset.rymOriginal5;
+
+        // Optional: clean title hint if you want; safest is to leave existing title alone
+      });
+  };
+
   const run = () => {
+    if (!ENABLED) return;
     convertTargets();
     convertMaxRating();
     convertTracklistRatings();
   };
 
   // Initial run
-  run();
-  console.log(`${EXT_TAG} Phase 3 active (max + tracklist)`);
+  (async () => {
+    ENABLED = await loadEnabled();
+
+    if (ENABLED) run();
+    console.log(`${EXT_TAG} enabled=${ENABLED}`);
+
+    // React to popup changes live
+    if (chrome?.storage?.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== "sync") return;
+        if (!changes.enabled) return;
+
+        ENABLED = !!changes.enabled.newValue;
+
+        if (!ENABLED) restoreAll();
+        else run();
+      });
+    }
+  })();
 
   // Dynamic updates
   let scheduled = false;
@@ -109,7 +155,7 @@
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
-      run();
+      if (ENABLED) run();
     });
   };
 

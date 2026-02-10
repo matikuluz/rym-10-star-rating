@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "RYM ratings to /10",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Doubles RateYourMusic ratings (out of 5) to display them out of 10.",
+  "permissions": ["storage"],
   "host_permissions": [
     "https://rateyourmusic.com/*",
     "https://www.rateyourmusic.com/*"
   ],
+  "action": {
+    "default_title": "RYM /10",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": [
