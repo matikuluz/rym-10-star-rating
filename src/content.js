@@ -1,23 +1,26 @@
 (() => {
   const EXT_TAG = "[RYM ratings to /10]";
 
-  // Stable selectors (less brittle than full #column_container_right > ... chains)
+  // These are the main “release page” rating nodes you already targeted
   const TARGETS = [
     { selector: "span.avg_rating", kind: "value" },
     { selector: "span.avg_rating_friends", kind: "value" },
-    { selector: "span.max_rating", kind: "max" },
     { selector: "[id^='rating_num_l_']", kind: "value" }
   ];
 
+  // Containers where the rating number is often nested:
+  const MAX_RATING_CONTAINER = ".max_rating"; // the "5.0" part next to the slash
+  const TRACK_STATS_CONTAINER = ".page_release_section_tracks_songs_song_stats"; // per-track right-side stats
+
   const format = (n, decimals) => {
     const s = n.toFixed(decimals);
-    // trim trailing zeros nicely
     return s.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
   };
 
-  const parseMaybe = (txt) => {
+  // Parse values from /5 scale. Returns null if not a 0..5 number.
+  const parseMaybe5 = (txt) => {
     const t = (txt || "").trim();
-    // allow "3.42", "5", "5.0", "3.42/5"
+    // allow "3.42" or "3.42/5"
     const m = t.match(/^([0-5](?:\.\d{1,2})?)(?:\s*\/\s*5(?:\.0{1,2})?)?$/);
     if (!m) return null;
     const v = Number(m[1]);
@@ -25,56 +28,91 @@
     return { value: v, raw: t };
   };
 
-  const convertNodeText = (el, kind) => {
-    if (!el || el.dataset.rym10Done === "1") return;
+  const decimalsFromText = (rawText) => {
+    const t = (rawText || "").trim();
+    const dot = t.indexOf(".");
+    if (dot === -1) return 0;
+    const d = t.length - dot - 1;
+    return Math.min(Math.max(d, 1), 2);
+  };
 
-    // Some RYM nodes are nested; read full text but only rewrite the element’s own textContent
+  const convertElement = (el, kind) => {
+    if (!el) return;
+
+    // Idempotence: if we already converted THIS element, skip.
+    if (el.dataset.rym10Done === "1") return;
+
     const rawText = (el.textContent || "").trim();
-    if (!rawText || rawText.includes("/10")) return;
+    if (!rawText) return;
 
-    const parsed = parseMaybe(rawText);
+    // If it already clearly looks like a /10 display, skip.
+    if (rawText.includes("/10")) return;
+
+    const parsed = parseMaybe5(rawText);
     if (!parsed) return;
 
-    const decimals = (() => {
-      const dot = rawText.indexOf(".");
-      if (dot === -1) return 0;
-      // keep 1–2 decimals depending on what was shown
-      const d = rawText.length - dot - 1;
-      return Math.min(Math.max(d, 1), 2);
-    })();
-
-    const doubled = parsed.value * 2;
+    const decimals = decimalsFromText(rawText);
 
     el.dataset.rym10Done = "1";
     el.dataset.rymOriginal5 = parsed.raw;
 
-    // For max rating, we want 10 (or 10.0 if it was 5.0)
     if (kind === "max") {
-      const maxDecimals = decimals; // preserve whether it showed 5 vs 5.0
-      el.textContent = format(10, maxDecimals);
+      // Max is always 5.x → 10.x
+      el.textContent = format(10, decimals);
       return;
     }
 
-    // For values, show the doubled number. We do NOT force "/10" here because on many pages
-    // the "/5" is a separate element (span.max_rating) that we also convert to 10.
-    el.textContent = format(doubled, decimals);
+    // Normal rating value (avg, friends, etc.)
+    el.textContent = format(parsed.value * 2, decimals);
 
-    // Helpful hover to confirm
     const prevTitle = el.getAttribute("title");
-    const hint = `Original: ${parsed.value}${rawText.includes("/") ? "/5" : ""}`;
+    const hint = `Original: ${format(parsed.value, decimals)}/5`;
     el.setAttribute("title", prevTitle ? `${prevTitle} • ${hint}` : hint);
   };
 
-  const run = () => {
+  // Convert direct targets
+  const convertTargets = () => {
     for (const t of TARGETS) {
-      document.querySelectorAll(t.selector).forEach((el) => convertNodeText(el, t.kind));
+      document.querySelectorAll(t.selector).forEach((el) => convertElement(el, t.kind));
     }
   };
 
-  run();
-  console.log(`${EXT_TAG} conversion active (selector-driven)`);
+  // Convert nested max rating (the "5.0" next to slash) WITHOUT breaking layout:
+  // Only touch leaf elements inside .max_rating that contain just the number.
+  const convertMaxRating = () => {
+    document.querySelectorAll(MAX_RATING_CONTAINER).forEach((container) => {
+      // If container itself is leaf, convert it
+      if (container.children.length === 0) convertElement(container, "max");
 
-  // Handle dynamic updates
+      // Convert leaf descendants
+      container.querySelectorAll("*").forEach((el) => {
+        if (el.children.length === 0) convertElement(el, "max");
+      });
+    });
+  };
+
+  // Convert tracklist ratings (right side of each track row)
+  // Again: only touch leaf elements inside the track stats container.
+  const convertTracklistRatings = () => {
+    document.querySelectorAll(TRACK_STATS_CONTAINER).forEach((container) => {
+      if (container.children.length === 0) convertElement(container, "value");
+      container.querySelectorAll("*").forEach((el) => {
+        if (el.children.length === 0) convertElement(el, "value");
+      });
+    });
+  };
+
+  const run = () => {
+    convertTargets();
+    convertMaxRating();
+    convertTracklistRatings();
+  };
+
+  // Initial run
+  run();
+  console.log(`${EXT_TAG} Phase 3 active (max + tracklist)`);
+
+  // Dynamic updates
   let scheduled = false;
   const schedule = () => {
     if (scheduled) return;
