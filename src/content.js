@@ -13,10 +13,8 @@
   const MAX_RATING_CONTAINER = ".max_rating"; // the "5.0" part next to the slash
   const TRACK_STATS_CONTAINER = ".page_release_section_tracks_songs_song_stats"; // per-track right-side stats
 
-  const format = (n, decimals) => {
-    const s = n.toFixed(decimals);
-    return s.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
-  };
+  const format2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
+  const format1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
 
   // Parse values from /5 scale. Returns null if not a 0..5 number.
   const parseMaybe5 = (txt) => {
@@ -27,14 +25,6 @@
     const v = Number(m[1]);
     if (!Number.isFinite(v) || v < 0 || v > 5) return null;
     return { value: v, raw: t };
-  };
-
-  const decimalsFromText = (rawText) => {
-    const t = (rawText || "").trim();
-    const dot = t.indexOf(".");
-    if (dot === -1) return 0;
-    const d = t.length - dot - 1;
-    return Math.min(Math.max(d, 1), 2);
   };
 
   const convertElement = (el, kind) => {
@@ -52,22 +42,21 @@
     const parsed = parseMaybe5(rawText);
     if (!parsed) return;
 
-    const decimals = decimalsFromText(rawText);
-
     el.dataset.rym10Done = "1";
     el.dataset.rymOriginal5 = parsed.raw;
 
     if (kind === "max") {
       // Max is always 5.x → 10.x
-      el.textContent = format(10, decimals);
+      el.textContent = format2(10);
       return;
     }
 
     // Normal rating value (avg, friends, etc.)
-    el.textContent = format(parsed.value * 2, decimals);
+    const converted = kind === "track" ? format1(parsed.value * 2) : format2(parsed.value * 2);
+    el.textContent = converted;
 
     const prevTitle = el.getAttribute("title");
-    const hint = `Original: ${format(parsed.value, decimals)}/5`;
+    const hint = `Original: ${format2(parsed.value)}/5`;
     el.setAttribute("title", prevTitle ? `${prevTitle} • ${hint}` : hint);
   };
 
@@ -96,9 +85,9 @@
   // Again: only touch leaf elements inside the track stats container.
   const convertTracklistRatings = () => {
     document.querySelectorAll(TRACK_STATS_CONTAINER).forEach((container) => {
-      if (container.children.length === 0) convertElement(container, "value");
+      if (container.children.length === 0) convertElement(container, "track");
       container.querySelectorAll("*").forEach((el) => {
-        if (el.children.length === 0) convertElement(el, "value");
+        if (el.children.length === 0) convertElement(el, "track");
       });
     });
   };
