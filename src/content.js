@@ -5,7 +5,7 @@
   const TARGETS = [
     { selector: "span.avg_rating", kind: "value" },
     { selector: "span.avg_rating_friends", kind: "value" },
-    { selector: "[id^='rating_num_l_']", kind: "value" },
+    { selector: "[id^='rating_num_l_']", kind: "user" },
     { selector: ".page_charts_section_charts_item_details_average_num", kind: "value" }
   ];
 
@@ -24,6 +24,10 @@
 
   const format2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
   const format1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+  const formatCompact = (n) => {
+    const s = (Math.round(n * 100) / 100).toFixed(2);
+    return s.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+  };
 
   // Parse values from /5 scale. Returns null if not a 0..5 number.
   const parseMaybe5 = (txt) => {
@@ -61,7 +65,12 @@
     }
 
     // Normal rating value (avg, friends, etc.)
-    const converted = kind === "track" ? format1(parsed.value * 2) : format2(parsed.value * 2);
+    const converted =
+      kind === "track"
+        ? format1(parsed.value * 2)
+        : kind === "user"
+          ? format1(parsed.value * 2)
+          : format2(parsed.value * 2);
     el.textContent = converted;
 
     const prevTitle = el.getAttribute("title");
