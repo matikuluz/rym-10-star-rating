@@ -6,7 +6,9 @@
     { selector: "span.avg_rating", kind: "value" },
     { selector: "span.avg_rating_friends", kind: "value" },
     { selector: "[id^='rating_num_l_']", kind: "user" },
-    { selector: ".page_charts_section_charts_item_details_average_num", kind: "value" }
+    { selector: ".page_charts_section_charts_item_details_average_num", kind: "value" },
+    { selector: "#rating_num_z_5", kind: "oneDecimal" },
+    { selector: "#musicrating table tbody tr td:first-child a", kind: "oneDecimal" },
   ];
 
   // Containers where the rating number is often nested:
@@ -66,10 +68,10 @@
 
     // Normal rating value (avg, friends, etc.)
     const converted =
-      kind === "track"
+      (kind === "track" || kind === "oneDecimal")
         ? format1(parsed.value * 2)
         : kind === "user"
-          ? format1(parsed.value * 2)
+          ? formatCompact(parsed.value * 2)
           : format2(parsed.value * 2);
     el.textContent = converted;
 
